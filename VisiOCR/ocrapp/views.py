@@ -8,6 +8,8 @@ from django.views.decorators.csrf import csrf_exempt
 import re
 from django.template.loader import get_template
 from xhtml2pdf import pisa
+import mysql.connector
+from mysql.connector import Error
 
 def home(request):
     return render(request, 'ocr_app/home.html')
@@ -32,8 +34,10 @@ def parse_text(text):
     birth_date = None
     
      # Extract Name from pan card format
-    name_match_pan = re.search(r'(Name\s*\n[A-Z]+[\s]+[A-Z]+[\s]+[A-Z]+[\s])' or r'(Name\s*\n[A-Z]+[\s]+[A-Z]+[\s])' , text)  
-
+    name_match_pan = re.search(r'(\s*\n[A-Z]+[\s]+[A-Z]+[\s]+[A-Z]+[\s])' or r'(\s*\n[A-Z]+[\s]+[A-Z]+[\s])' , text)  
+    #name_match_pan = re.search(r'Name\s*[:|-]?\s*(\b[A-Z\s]+\b)', text, re.IGNORECASE)
+    #name_match_pan = re.search(r'Name[:|-]?\s*([A-Z\s]+)', text, re.IGNORECASE)  
+  
     # Extract Name from Aadhaar card format
     name_match_aadhaar = re.search(r'([A-Z][a-zA-Z\s]+[A-Z][a-zA-Z\s]+[A-Z][a-zA-Z]+)'or r'([A-Z][a-zA-Z\s]+[A-Z][a-zA-Z]+)', text)
     
@@ -58,7 +62,86 @@ def parse_text(text):
         birth_date = dob_match_aadhaar.group(1).strip()
     return name, birth_date
     
+import mysql.connector
+from mysql.connector import Error
+
+def create_connection():
+    try:
+        connection = mysql.connector.connect(
+            host='localhost',
+            database='OCR',
+            user='root',
+            password='root'
+        )
+        return connection
+    except Error as e:
+        print("Error while connecting to MySQL", e)
+        return None
+
+def create_table(connection):
+    try:
+        if connection.is_connected():
+            cursor = connection.cursor()
+            
+            # Create table if not exists
+            cursor.execute("CREATE TABLE IF NOT EXISTS extracted_data (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255), birth_date DATE)")
+            connection.commit()
+            print("Table 'extracted_data' created successfully")
+
+            cursor.close()
+    except Error as e:
+        print("Error while creating table", e)
+
+def insert_data(connection, name, birth_date):
+    try:
+        if connection.is_connected():
+            cursor = connection.cursor()
+
+            # Sanitize name input to prevent SQL injection
+            sanitized_name = name.replace("'", "''")
+
+            # Convert birth_date format to YYYY-MM-DD
+            birth_date = datetime.strptime(birth_date, "%d/%m/%Y").strftime("%Y-%m-%d")
+
+            # Insert data into the table
+            cursor.execute("INSERT INTO extracted_data (name, birth_date) VALUES (%s, %s)", (sanitized_name, birth_date))
+            connection.commit()
+            print("Record inserted successfully")
+            print(f"Name: {sanitized_name}, Birth Date: {birth_date}")
+
+            cursor.close()
+    except Error as e:
+        print("Error while inserting data into table:", e)
+        print(f"Failed to insert data: Name: {sanitized_name}, Birth Date: {birth_date}")
+
 def process_image(image):
+    name, birth_date = extract_info(image)
+
+    if birth_date is None or name is None:
+        return name, None, None 
+
+    connection = create_connection()
+    if not connection:
+        return name, None, None
+
+    try:
+        create_table(connection)
+        insert_data(connection, name, birth_date)
+    finally:
+        if connection and connection.is_connected():
+            connection.close()
+            print("MySQL connection is closed")
+
+    try:
+        birth_date = datetime.strptime(birth_date, "%d/%m/%Y")
+        age = (datetime.now() - birth_date).days // 365
+    except (ValueError, TypeError):
+        birth_date = None
+        age = None
+
+    return name, birth_date.strftime('%d/%m/%Y'), age
+
+'''def process_image(image):
     name, birth_date = extract_info(image)
 
     if birth_date is None:
@@ -81,7 +164,7 @@ def process_image(image):
         birth_date = None
         age = None
 
-    return name, birth_date.strftime('%d/%m/%Y'), age
+    return name, birth_date.strftime('%d/%m/%Y'), age'''
 
 @csrf_exempt  
 def upload_image(request):
