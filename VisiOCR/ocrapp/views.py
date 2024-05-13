@@ -13,6 +13,9 @@ import base64
 from io import BytesIO
 import mysql.connector
 from mysql.connector import Error
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
 
 def home(request):
     return render(request, 'ocr_app/home.html')
@@ -68,60 +71,62 @@ def create_connection():
         )
         return connection
     except Error as e:
-        print("Error while connecting to MySQL", e)
+        logging.error("Error while connecting to MySQL: %s", e)
         return None
 
 def create_table(connection):
     try:
         if connection.is_connected():
             cursor = connection.cursor()
-            cursor.execute("CREATE TABLE IF NOT EXISTS extracted_data (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255), birth_date DATE, pan_number VARCHAR(10), aadhaar_number VARCHAR(12))")
+            cursor.execute("CREATE TABLE IF NOT EXISTS extracted_data (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255), birth_date DATE, pan_number VARCHAR(10), aadhaar_number VARCHAR(12), age INT, qr_code_image BLOB)")
             connection.commit()
-            print("Table 'extracted_data' created successfully")
+            logging.debug("Table 'extracted_data' created successfully")
             cursor.close()
     except Error as e:
-        print("Error while creating table", e)
+        logging.error("Error while creating table: %s", e)
 
-def insert_data(connection, name, birth_date, pan_number, aadhaar_number):
+def insert_data(connection, name, birth_date, pan_number, aadhaar_number, qr_code_image_data, age):
     try:
         if connection.is_connected():
             cursor = connection.cursor()
             sanitized_name = name.replace("'", "''")
             birth_date = datetime.strptime(birth_date, "%d/%m/%Y").strftime("%Y-%m-%d")
-            cursor.execute("INSERT INTO extracted_data (name, birth_date, pan_number, aadhaar_number) VALUES (%s, %s, %s, %s)", (sanitized_name, birth_date, pan_number, aadhaar_number))
+            cursor.execute("INSERT INTO extracted_data (name, birth_date, pan_number, aadhaar_number, qr_code_image, age) VALUES (%s, %s, %s, %s, %s, %s)", (sanitized_name, birth_date, pan_number, aadhaar_number, qr_code_image_data, age))
             connection.commit()
-            print("Record inserted successfully")
-            print(f"Name: {sanitized_name}, Birth Date: {birth_date}, PAN Number: {pan_number}, Aadhaar Number: {aadhaar_number}")
+            logging.debug("Record inserted successfully")
+            logging.debug("Name: %s, Birth Date: %s, PAN Number: %s, Aadhaar Number: %s", sanitized_name, birth_date, pan_number, aadhaar_number)
             cursor.close()
     except Error as e:
-        print("Error while inserting data into table:", e)
-        print(f"Failed to insert data: Name: {sanitized_name}, Birth Date: {birth_date}, PAN Number: {pan_number}, Aadhaar Number: {aadhaar_number}")
+        logging.error("Error while inserting data into table: %s", e)
+        logging.error("Failed to insert data: Name: %s, Birth Date: %s, PAN Number: %s, Aadhaar Number: %s", sanitized_name, birth_date, pan_number, aadhaar_number)
 
 def process_image(image):
     name, birth_date, pan_number, aadhaar_number = extract_info(image)
+    logging.debug("Extracted Info: Name=%s, Birth Date=%s, PAN Number=%s, Aadhaar Number=%s", name, birth_date, pan_number, aadhaar_number)
     if birth_date is None or name is None:
+        logging.error("Failed to extract valid name or birth date from the image.")
         return name, None, None, None 
 
     connection = create_connection()
     if not connection:
+        logging.error("Failed to establish a database connection.")
         return name, None, None, None
 
     try:
         create_table(connection)
-        insert_data(connection, name, birth_date, pan_number, aadhaar_number)
+        qr_code_image_data = create_qr_code(name)
+        birth_date_obj = datetime.strptime(birth_date, "%d/%m/%Y")
+        age = (datetime.now() - birth_date_obj).days // 365
+        insert_data(connection, name, birth_date, pan_number, aadhaar_number, qr_code_image_data, age)
+    except Exception as e:
+        logging.error("Error processing image: %s", e)
     finally:
         if connection and connection.is_connected():
             connection.close()
-            print("MySQL connection is closed")
+            logging.debug("MySQL connection is closed")
 
-    try:
-        birth_date = datetime.strptime(birth_date, "%d/%m/%Y")
-        age = (datetime.now() - birth_date).days // 365
-    except (ValueError, TypeError):
-        birth_date = None
-        age = None
+    return name, birth_date, age, pan_number, aadhaar_number
 
-    return name, birth_date.strftime('%d/%m/%Y'), age, pan_number, aadhaar_number
 
 def create_qr_code(data):
     qr = qrcode.QRCode(
