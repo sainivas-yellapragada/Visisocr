@@ -80,7 +80,7 @@ DATABASES = {
         'NAME': 'OCR',
         'USER': 'root',
         'PASSWORD': 'root',
-        'HOST': 'localhost',   # Assuming MySQL server is running on localhost
+        'HOST': 'localhost',
         'PORT': '3306',
     }
 }
