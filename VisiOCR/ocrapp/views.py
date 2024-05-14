@@ -37,29 +37,91 @@ def parse_text(text):
     pan_number = None
     aadhaar_number = None
 
-    pan_match = re.search(r'([A-Z]{5}[0-9]{4}[A-Z]{1})', text)
-    name_match_pan = re.search(r'(\s*\n[A-Z]+[\s]+[A-Z]+[\s]+[A-Z]+[\s])' or r'(\s*\n[A-Z]+[\s]+[A-Z]+[\s])', text)  
+    all_text_list = re.split(r'[\n]', text)
+    text_list = list()
+    
+    pan_pattern = r'[A-Z]{5}[0-9]{4}[A-Z]{1}'
+    pan_match = re.search(pan_pattern, text)
     if pan_match:
         pan_number = pan_match.group(0).strip()
-    if name_match_pan:
-        name = name_match_pan.group(1).strip()
 
-    aadhaar_match = re.search(r'\b\d{4}\s\d{4}\s\d{4}\b', text)
-    name_match_aadhaar = re.search(r'([A-Z][a-zA-Z\s]+[A-Z][a-zA-Z\s]+[A-Z][a-zA-Z]+)' or r'([A-Z][a-zA-Z\s]+[A-Z][a-zA-Z]+)', text)
-    if aadhaar_match:
-        aadhaar_number = aadhaar_match.group(0).strip()
-    if name_match_aadhaar:
-        name = name_match_aadhaar.group(0).strip()
+    aadhar_pattern = r'\d{4}\s\d{4}\s\d{4}'
+    aadhar_match = re.search(aadhar_pattern, text)
+    if aadhar_match:
+        aadhaar_number = aadhar_match.group(0).strip()
 
-    dob_match_pan = re.search(r'(\d{2}/\d{2}/\d{4})', text, re.IGNORECASE)
-    if dob_match_pan:
-        birth_date = dob_match_pan.group(0).strip()
+    for i in all_text_list:
+        if re.match(r'^(\s)+$', i) or i=='':
+            continue
+        else:
+            text_list.append(i)
 
-    dob_match_aadhaar = re.search(r'(\d{2}/\d{2}/\d{4})', text)
-    if dob_match_aadhaar:
-        birth_date = dob_match_aadhaar.group(1).strip()
+    if "MALE" in text or "male" in text or "FEMALE" in text or "female" in text :
+        name, birth_date = extract_aadhar_info(text_list)
+    else:
+        name, birth_date = extract_pan_info(text)
 
     return name, birth_date, pan_number, aadhaar_number
+    
+
+def extract_aadhar_info(text_list):
+    user_dob = str()
+    user_name = str()
+    aadhar_dob_pat = r'(YoB|YOB:|DOB:|DOB|AOB)'
+    date_ele = str()
+    index = None
+    for idx, i in enumerate(text_list):
+        if re.search(aadhar_dob_pat, i):
+            index = re.search(aadhar_dob_pat, i).span()[1]
+            date_ele = i
+            dob_idx = idx
+        else:
+            continue
+
+    if index is not None:
+        date_str = ''
+        for i in date_ele[index:]:
+            if re.match(r'\d', i):
+                date_str = date_str + i
+            elif re.match(r'/', i):
+                date_str = date_str + i
+            else:
+                continue
+
+        user_dob = date_str
+
+        user_name = text_list[dob_idx - 1]
+        pattern = re.search(r'([A-Z][a-zA-Z\s]+)', user_name)
+
+        if pattern:
+            name = pattern.group(0).strip()
+        else:
+            name = None
+
+        return name, user_dob
+    else:
+        return None, None
+
+def extract_pan_info(text):
+    pancard_name=None
+    name_patterns = [
+        r'(Name\s*\n[A-Z]+[\s]+[A-Z]+[\s]+[A-Z]+[\s])',  
+        r'(Name\s*\n[A-Z]+[\s]+[A-Z]+[\s])', 
+        r'(Name\s*\n[A-Z\s]+)'  
+    ]
+    for pattern in name_patterns:
+            name_match_pan = re.search(pattern,text)
+            if name_match_pan:
+                matched_name = name_match_pan.group(1).strip().replace('\n', ' ') 
+                pancard_name = re.sub(r'^Name\s+', '', matched_name)
+                break
+    dob_match_pan = re.search(r'(\d{2}/\d{2}/\d{4})', text, re.IGNORECASE)
+    if dob_match_pan:
+        birth_date = dob_match_pan.group(0).strip() 
+    else:
+        birth_date = None
+
+    return pancard_name, birth_date
 
 def create_connection():
     try:
