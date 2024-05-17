@@ -127,7 +127,7 @@ def create_connection():
     try:
         connection = mysql.connector.connect(
             host='localhost',
-            database='OCR',
+            database='visiocr',
             user='root',
             password='root'
         )

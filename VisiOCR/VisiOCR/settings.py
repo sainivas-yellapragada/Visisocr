@@ -77,7 +77,7 @@ WSGI_APPLICATION = 'VisiOCR.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'OCR',
+        'NAME': 'visiocr',
         'USER': 'root',
         'PASSWORD': 'root',
         'HOST': 'localhost',
