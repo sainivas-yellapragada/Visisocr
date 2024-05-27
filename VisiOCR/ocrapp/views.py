@@ -14,7 +14,7 @@ from io import BytesIO
 import mysql.connector
 from mysql.connector import Error
 import logging
-
+from datetime import timedelta
 logging.basicConfig(level=logging.DEBUG)
 
 def home(request):
@@ -51,18 +51,17 @@ def parse_text(text):
         aadhaar_number = aadhar_match.group(0).strip()
 
     for i in all_text_list:
-        if re.match(r'^(\s)+$', i) or i=='':
+        if re.match(r'^(\s)+$', i) or i == '':
             continue
         else:
             text_list.append(i)
 
-    if "MALE" in text or "male" in text or "FEMALE" in text or "female" in text :
+    if "MALE" in text or "male" in text or "FEMALE" in text or "female" in text:
         name, birth_date = extract_aadhar_info(text_list)
     else:
         name, birth_date = extract_pan_info(text)
 
     return name, birth_date, pan_number, aadhaar_number
-    
 
 def extract_aadhar_info(text_list):
     user_dob = str()
@@ -103,21 +102,21 @@ def extract_aadhar_info(text_list):
         return None, None
 
 def extract_pan_info(text):
-    pancard_name=None
+    pancard_name = None
     name_patterns = [
-        r'(Name\s*\n[A-Z]+[\s]+[A-Z]+[\s]+[A-Z]+[\s])',  
-        r'(Name\s*\n[A-Z]+[\s]+[A-Z]+[\s])', 
-        r'(Name\s*\n[A-Z\s]+)'  
+        r'(Name\s*\n[A-Z]+[\s]+[A-Z]+[\s]+[A-Z]+[\s])',
+        r'(Name\s*\n[A-Z]+[\s]+[A-Z]+[\s])',
+        r'(Name\s*\n[A-Z\s]+)'
     ]
     for pattern in name_patterns:
-            name_match_pan = re.search(pattern,text)
-            if name_match_pan:
-                matched_name = name_match_pan.group(1).strip().replace('\n', ' ') 
-                pancard_name = re.sub(r'^Name\s+', '', matched_name)
-                break
+        name_match_pan = re.search(pattern, text)
+        if name_match_pan:
+            matched_name = name_match_pan.group(1).strip().replace('\n', ' ')
+            pancard_name = re.sub(r'^Name\s+', '', matched_name)
+            break
     dob_match_pan = re.search(r'(\d{2}/\d{2}/\d{4})', text, re.IGNORECASE)
     if dob_match_pan:
-        birth_date = dob_match_pan.group(0).strip() 
+        birth_date = dob_match_pan.group(0).strip()
     else:
         birth_date = None
 
@@ -176,7 +175,7 @@ def process_image(image):
 
     try:
         create_table(connection)
-        qr_code_image_data = create_qr_code(name)
+        qr_code_image_data = create_qr_code(name, birth_date, pan_number, aadhaar_number)
         birth_date_obj = datetime.strptime(birth_date, "%d/%m/%Y")
         age = (datetime.now() - birth_date_obj).days // 365
         insert_data(connection, name, birth_date, pan_number, aadhaar_number, qr_code_image_data, age)
@@ -189,8 +188,13 @@ def process_image(image):
 
     return name, birth_date, age, pan_number, aadhaar_number
 
-
-def create_qr_code(data):
+def create_qr_code(name, birth_date, pan_number, aadhaar_number):
+    data = {
+        "name": name,
+        "birth_date": birth_date,
+        "pan_number": pan_number,
+        "aadhaar_number": aadhaar_number
+    }
     qr = qrcode.QRCode(
         version=1,
         error_correction=qrcode.constants.ERROR_CORRECT_L,
@@ -210,19 +214,43 @@ def create_qr_code(data):
     
     return qr_code_image_data
 
+
+
+
 @csrf_exempt  
 def upload_image(request):
     if request.method == 'POST' and 'image' in request.FILES:
         uploaded_file = request.FILES['image']
         image = cv2.imdecode(np.frombuffer(uploaded_file.read(), np.uint8), -1)
-        name, birth_date, age, pan_number, aadhaar_number = process_image(image)
-        qr_code_image_data = create_qr_code(name)
-        if birth_date is None and name is None:
-            return render(request, 'ocr_app/home.html', {'error_message': "Image quality is too poor. Please try again."})
         
-        return render(request, 'ocr_app/home.html', {'name': name, 'birth_date': birth_date, 'age': age, 'pan_number': pan_number, 'aadhaar_number': aadhaar_number, 'qr_code_image_data': qr_code_image_data})
+        try:
+            name, birth_date, age, pan_number, aadhaar_number = process_image(image)
+            if birth_date is None and name is None:
+                return render(request, 'ocr_app/home.html', {'error_message': "Image quality is too poor. Please take another picture and upload again."})
+        except ValueError as ve:
+            logging.error("Error during image processing: %s", ve)
+            return render(request, 'ocr_app/home.html', {'error_message': "Image quality is too poor. Please take another picture and upload again."})
+        
+        qr_code_image_data = create_qr_code(name, birth_date, pan_number, aadhaar_number)
+        
+        # Calculate the expiry date
+        current_date = datetime.now().date()
+        expiry_date = current_date + timedelta(days=5)
+        
+        context = {
+            'name': name,
+            'birth_date': birth_date,
+            'age': age,
+            'pan_number': pan_number,
+            'aadhaar_number': aadhaar_number,
+            'qr_code_image_data': qr_code_image_data,
+            'expiry_date': expiry_date.strftime('%d-%m-%Y')  # Format the expiry date
+        }
+        
+        return render(request, 'ocr_app/home.html', context)
     
     return render(request, 'ocr_app/home.html')
+
 
 def download_pdf(request):
     template_path = 'ocr_app/pdf_template.html'
@@ -242,3 +270,4 @@ def download_pdf(request):
     if pisa_status.err:
         return HttpResponse('We had some errors <pre>' + html + '</pre>')
     return response
+

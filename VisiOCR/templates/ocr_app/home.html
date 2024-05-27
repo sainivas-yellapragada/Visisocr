@@ -61,10 +61,21 @@
             max-width: 200px;
             height: auto;
         }
+        .error-message {
+            color: red;
+            font-weight: bold;
+            margin-top: 10px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
     <div class="container">
+        {% if error_message %}
+        <div class="error-message">
+            <p>{{ error_message }}</p>
+        </div>
+        {% endif %}
         <div class="id-card">
             <h2>Name: {{ name }}</h2>
             <p class="label">Date of Birth: {{ birth_date }}</p>
@@ -75,6 +86,7 @@
             {% if aadhaar_number and not pan_number %}
             <p class="label">Aadhaar Number: {{ aadhaar_number }}</p>
             {% endif %}
+            <p class="label">Pass Expires On: {{ expiry_date }}</p> <!-- Added expiry date -->
         </div>
         <div class="qr-code">
             {% if qr_code_image_data %}
@@ -101,6 +113,7 @@
             <input type="hidden" name="age" value="{{ age }}">
             <input type="hidden" name="pan_number" value="{{ pan_number }}">
             <input type="hidden" name="aadhaar_number" value="{{ aadhaar_number }}">
+            <input type="hidden" name="expiry_date" value="{{ expiry_date }}"> <!-- Pass expiry date to the form -->
             <button type="submit" class="file-upload-btn">Download as PDF</button>
         </form>
         {% endif %}
