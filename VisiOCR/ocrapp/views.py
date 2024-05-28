@@ -56,10 +56,11 @@ def parse_text(text):
         else:
             text_list.append(i)
 
-    if "MALE" in text or "male" in text or "FEMALE" in text or "female" in text:
+    if "MALE" in text or "male" in text or "FEMALE" in text or "female" in text: 
         name, birth_date = extract_aadhar_info(text_list)
     else:
         name, birth_date = extract_pan_info(text)
+        # aadhar card has gender ,pan card doesn't based on this we differentiate between pan card or aadhar card
 
     return name, birth_date, pan_number, aadhaar_number
 
