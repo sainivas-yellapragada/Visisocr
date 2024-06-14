@@ -17,6 +17,7 @@ import logging
 from datetime import timedelta
 logging.basicConfig(level=logging.DEBUG)
 
+
 def home(request):
     return render(request, 'ocr_app/home.html')
 
@@ -136,7 +137,7 @@ def create_connection():
         logging.error("Error while connecting to MySQL: %s", e)
         return None
 
-def create_table(connection):
+'''def create_table(connection):
     try:
         if connection.is_connected():
             cursor = connection.cursor()
@@ -145,9 +146,32 @@ def create_table(connection):
             logging.debug("Table 'extracted_data' created successfully")
             cursor.close()
     except Error as e:
+        logging.error("Error while creating table: %s", e)'''
+def create_table(connection):
+    try:
+        if connection.is_connected():
+            cursor = connection.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS extracted_data (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    name VARCHAR(255),
+                    birth_date DATE,
+                    pan_number VARCHAR(10),
+                    aadhaar_number VARCHAR(20),
+                    age INT,
+                    qr_code_image BLOB,
+                    email VARCHAR(255),
+                    phone_number VARCHAR(15)
+                )
+            """)
+            connection.commit()
+            logging.debug("Table 'extracted_data' created successfully")
+            cursor.close()
+    except Error as e:
         logging.error("Error while creating table: %s", e)
 
-def insert_data(connection, name, birth_date, pan_number, aadhaar_number, qr_code_image_data, age):
+
+'''def insert_data(connection, name, birth_date, pan_number, aadhaar_number, qr_code_image_data, age):
     try:
         if connection.is_connected():
             cursor = connection.cursor()
@@ -161,8 +185,30 @@ def insert_data(connection, name, birth_date, pan_number, aadhaar_number, qr_cod
     except Error as e:
         logging.error("Error while inserting data into table: %s", e)
         logging.error("Failed to insert data: Name: %s, Birth Date: %s, PAN Number: %s, Aadhaar Number: %s", sanitized_name, birth_date, pan_number, aadhaar_number)
+'''
+def insert_data(connection, name, birth_date, pan_number, aadhaar_number, qr_code_image_data, age, phone_number, email):
+    try:
+        if connection.is_connected():
+            cursor = connection.cursor()
+            sanitized_name = name.replace("'", "''")
+            birth_date = datetime.strptime(birth_date, "%d/%m/%Y").strftime("%Y-%m-%d")
+            
+            logging.debug("Inserting data: Name=%s, Birth Date=%s, PAN Number=%s, Aadhaar Number=%s, Age=%s, Phone Number=%s, Email=%s", sanitized_name, birth_date, pan_number, aadhaar_number, age, phone_number, email)
 
-def process_image(image):
+            cursor.execute("""
+                INSERT INTO extracted_data 
+                (name, birth_date, pan_number, aadhaar_number, qr_code_image, age, phone_number, email) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, (sanitized_name, birth_date, pan_number, aadhaar_number, qr_code_image_data, age, phone_number, email))
+            connection.commit()
+            logging.debug("Record inserted successfully")
+            cursor.close()
+
+    except Error as e:
+        logging.error("Error while inserting data into table: %s", e)
+
+
+'''def process_image(image):
     name, birth_date, pan_number, aadhaar_number = extract_info(image)
     logging.debug("Extracted Info: Name=%s, Birth Date=%s, PAN Number=%s, Aadhaar Number=%s", name, birth_date, pan_number, aadhaar_number)
     if birth_date is None or name is None:
@@ -187,9 +233,39 @@ def process_image(image):
             connection.close()
             logging.debug("MySQL connection is closed")
 
-    return name, birth_date, age, pan_number, aadhaar_number
+    return name, birth_date, age, pan_number, aadhaar_number'''
+def process_image(image, phone_number, email):
+    try:
+        name, birth_date, pan_number, aadhaar_number = extract_info(image)
+        logging.debug("Extracted Info: Name=%s, Birth Date=%s, PAN Number=%s, Aadhaar Number=%s", name, birth_date, pan_number, aadhaar_number)
 
-def create_qr_code(name, birth_date, pan_number, aadhaar_number):
+        if not name or not birth_date:
+            logging.error("Name or Birth Date is missing")
+            return None, None, None, None, None, None, None
+
+        connection = create_connection()
+        if not connection:
+            logging.error("Failed to establish a database connection.")
+            return None, None, None, None, None, None, None
+
+        qr_code_image_data = create_qr_code(name, birth_date, pan_number, aadhaar_number, phone_number, email)
+        birth_date_obj = datetime.strptime(birth_date, "%d/%m/%Y")
+        age = (datetime.now() - birth_date_obj).days // 365
+
+        insert_data(connection, name, birth_date, pan_number, aadhaar_number, qr_code_image_data, age, phone_number, email)
+
+    except Exception as e:
+        logging.error("Error processing image: %s", e)
+        return None, None, None, None, None, None, None
+
+    finally:
+        if connection and connection.is_connected():
+            connection.close()
+            logging.debug("MySQL connection is closed")
+
+    return name, birth_date, age, pan_number, aadhaar_number, phone_number, email
+
+'''def create_qr_code(name, birth_date, pan_number, aadhaar_number):
     data = {
         "name": name,
         "birth_date": birth_date,
@@ -214,11 +290,84 @@ def create_qr_code(name, birth_date, pan_number, aadhaar_number):
     qr_code_image_data = base64.b64encode(qr_img_bytes.getvalue()).decode()
     
     return qr_code_image_data
+'''
+def create_qr_code(name, birth_date, pan_number, aadhaar_number, phone_number, email):
+    data = {
+        "name": name,
+        "birth_date": birth_date,
+        "pan_number": pan_number,
+        "aadhaar_number": aadhaar_number,
+        "phone_number": phone_number,
+        "email": email
+    }
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(data)
+    qr.make(fit=True)
+
+    qr_img = qr.make_image(fill_color="black", back_color="white")
+
+    qr_img_bytes = BytesIO()
+    qr_img.save(qr_img_bytes, format='PNG')
+    qr_img_bytes.seek(0)
+
+    qr_code_image_data = base64.b64encode(qr_img_bytes.getvalue()).decode()
+    
+    return qr_code_image_data
+
+@csrf_exempt
+def upload_image(request):
+    if request.method == 'POST' and 'image' in request.FILES:
+        uploaded_file = request.FILES['image']
+        phone_number = request.POST.get('phone_number', '')
+        email = request.POST.get('email', '')
+
+        try:
+            image = cv2.imdecode(np.frombuffer(uploaded_file.read(), np.uint8), -1)
+            name, birth_date, age, pan_number, aadhaar_number, phone_number, email = process_image(image, phone_number, email)
+            
+            if not name or not birth_date:
+                error_message = "Image quality is too poor. Please take another picture and upload again."
+                return render(request, 'ocr_app/home.html', {'error_message': error_message})
+
+            qr_code_image_data = create_qr_code(name, birth_date, pan_number, aadhaar_number, phone_number, email)
+
+            # Calculate the expiry date
+            current_date = datetime.now().date()
+            expiry_date = current_date + timedelta(days=5)
+
+            context = {
+                'name': name,
+                'birth_date': birth_date,
+                'age': age,
+                'pan_number': pan_number,
+                'aadhaar_number': aadhaar_number,
+                'qr_code_image_data': qr_code_image_data,
+                'expiry_date': expiry_date.strftime('%d-%m-%Y'),
+                'phone_number': phone_number,
+                'email': email,
+            }
+
+            return render(request, 'ocr_app/home.html', context)
+
+        except ValueError as ve:
+            logging.error("Error during image processing: %s", ve)
+            error_message = "Image quality is too poor. Please take another picture and upload again."
+            return render(request, 'ocr_app/home.html', {'error_message': error_message})
+
+        except Exception as e:
+            logging.error("Unexpected error during image processing: %s", e)
+            error_message = "Image quality is too poor. Please take another picture and upload again."
+            return render(request, 'ocr_app/home.html', {'error_message': error_message})
+
+    return render(request, 'ocr_app/home.html')
 
 
-
-
-@csrf_exempt  
+'''@csrf_exempt  
 def upload_image(request):
     if request.method == 'POST' and 'image' in request.FILES:
         uploaded_file = request.FILES['image']
@@ -251,25 +400,54 @@ def upload_image(request):
         return render(request, 'ocr_app/home.html', context)
     
     return render(request, 'ocr_app/home.html')
+'''
 
+from django.template.loader import render_to_string
+
+from django.shortcuts import render
+from django.http import HttpResponse
+from django.template.loader import get_template
+from xhtml2pdf import pisa
+import qrcode
+import base64
+from io import BytesIO
 
 def download_pdf(request):
     template_path = 'ocr_app/pdf_template.html'
+    
+    # Ensure all necessary data is retrieved from the request
+    name = request.POST.get('name')
+    birth_date = request.POST.get('birth_date')
+    age = request.POST.get('age')
+    pan_number = request.POST.get('pan_number')
+    aadhaar_number = request.POST.get('aadhaar_number')
+    email = request.POST.get('email')
+    phone_number = request.POST.get('phone_number')
+    expiry_date = request.POST.get('expiry_date')
+    qr_code_image_data = request.POST.get('qr_code_image_data')  # Retrieve QR code image data
+    
     context = {
-        'name': request.POST.get('name'),
-        'birth_date': request.POST.get('birth_date'),
-        'age': request.POST.get('age'),
-        'pan_number': request.POST.get('pan_number'),
-        'aadhaar_number': request.POST.get('aadhaar_number'),
-        'expiry_date' : request.POST.get('expiry_date')
+        'name': name,
+        'birth_date': birth_date,
+        'age': age,
+        'pan_number': pan_number,
+        'aadhaar_number': aadhaar_number,
+        'email': email,
+        'phone_number': phone_number,
+        'expiry_date': expiry_date,
+        'qr_code_image_data': qr_code_image_data,  # Pass QR code image data to context
     }
+
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = 'attachment; filename="visiting_pass.pdf"'
 
     template = get_template(template_path)
     html = template.render(context)
+    
+    # Generate PDF
     pisa_status = pisa.CreatePDF(html, dest=response)
+    
     if pisa_status.err:
         return HttpResponse('We had some errors <pre>' + html + '</pre>')
-    return response
-
+    
+    return response 

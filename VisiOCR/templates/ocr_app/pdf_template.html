@@ -10,75 +10,54 @@
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
-            background-color: #f0f0f0; /* Adding a light background color */
+            background-color: #f0f0f0;
         }
         .container {
-            width: 60%;
+            width: 80%;
             margin: 50px auto;
-            text-align: center;
             padding: 20px;
-            background-color: #fff; /* White background for the container */
+            background-color: #fff;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
             border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
         }
         .visiting-pass {
+            flex: 1;
             padding: 20px;
             margin-bottom: 20px;
             background-color: #f5f5f5;
-            border-radius: 10px; /* Rounded corners */
+            border-radius: 10px;
+            text-align: left;
         }
-        .visiting-pass h2 {
+        .visiting-pass h1 {
+            font-size: 30px;
             margin-bottom: 10px;
         }
         .visiting-pass p {
-            margin: 10px 0; /* Increased margin */
-            font-size: 15px; /* Increased font size */
+            margin: 10px 0;
+            font-size: 15px;
         }
-        /* Styling for individual data points */
         .visiting-pass strong {
             font-weight: bold;
-            font-size: 18px; /* Increased font size */
+            font-size: 18px;
         }
-        /* Button styling */
-        .download-btn, .file-upload-btn {
-            background-color: #4CAF50;
-            border: none;
-            color: white;
-            padding: 15px 32px;
-            text-align: center;
-            text-decoration: none;
-            display: inline-block;
-            font-size: 16px;
-            margin-top: 20px;
-            cursor: pointer;
-            border-radius: 5px;
-            transition: background-color 0.3s ease;
+        .qr-code {
+            flex: 1;
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
         }
-        .download-btn:hover, .file-upload-btn:hover {
-            background-color: #45a049;
-        }
-        /* File upload styling */
-        .file-upload {
-            margin-top: 20px;
-            display: none;
-        }
-        .file-upload-label {
-            background-color: #007bff;
-            color: white;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-        }
-        .file-upload-label:hover {
-            background-color: #0056b3;
+        .qr-code img {
+            max-width: 200px; /* Adjust the size as needed */
+            height: auto;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="visiting-pass">
-            <h1><p style="font-size:30px">Visiting Pass</h1></p>
+            <h1 align=center>Visiting Pass</h1>
             <p><strong>Name:</strong> {{ name }}<br>
             <strong>Date of Birth:</strong> {{ birth_date }}<br>
             <strong>Age:</strong> {{ age }}<br>
@@ -86,10 +65,22 @@
             <strong>PAN Number:</strong> {{ pan_number }}<br>
             {% endif %}
             {% if aadhaar_number %}
-            <strong>Aadhaar Number:</strong> {{ aadhaar_number }}</p>
+            <strong>Aadhaar Number:</strong> {{ aadhaar_number }}
             {% endif %}
-            <strong>Pass expires on:</strong> {{ expiry_date }}</p>
+            {% if email %}
+            <strong>Email:</strong> {{ email }}
+            {% endif %}
+            {% if phone_number %}
+            <strong>Phone Number:</strong> {{ phone_number }}</p>
+            {% endif %}
+            <p><strong>Pass expires on:</strong> {{ expiry_date }}</p>
+            {% if qr_code_image_data %}
+            <img src="data:image/png;base64,{{ qr_code_image_data }}" alt="QR Code" width=200px height=auto>
+            {% else %}
+            <p>No QR Code available</p>
+            {% endif %}
         </div>
+        
     </div>
 </body>
 </html>

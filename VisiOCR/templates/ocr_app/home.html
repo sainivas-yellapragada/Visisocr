@@ -10,7 +10,7 @@
             background-color: #f0f0f0;
         }
         .container {
-            width: 400px;
+            max-width: 800px;
             margin: 50px auto;
             background-color: #fff;
             border: 1px solid #ccc;
@@ -18,11 +18,18 @@
             border-radius: 10px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
             display: flex;
-            flex-direction: column;
-            align-items: center;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        .details-column {
+            width: 60%;
+        }
+        .qr-code-column {
+            width: 30%;
+            text-align: center;
         }
         .id-card {
-            text-align: center;
+            text-align: left;
         }
         .id-card h2 {
             margin-bottom: 5px;
@@ -32,6 +39,33 @@
         }
         .id-card .label {
             font-weight: bold;
+        }
+        .qr-code {
+            margin-top: 20px;
+        }
+        .qr-code img {
+            max-width: 200px; /* Adjust the size as needed */
+            height: auto;
+        }
+        .error-message {
+            color: red;
+            font-weight: bold;
+            margin-top: 10px;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .form-group input {
+            width: calc(100% - 20px);
+            padding: 8px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 5px;
         }
         .file-upload-btn {
             background-color: #007bff;
@@ -54,69 +88,77 @@
         .file-upload input[type="file"] {
             display: none;
         }
-        .qr-code {
-            margin-top: 20px;
-        }
-        .qr-code img {
-            max-width: 200px;
-            height: auto;
-        }
-        .error-message {
-            color: red;
-            font-weight: bold;
-            margin-top: 10px;
-            text-align: center;
-        }
     </style>
 </head>
 <body>
     <div class="container">
-        {% if error_message %}
-        <div class="error-message">
-            <p>{{ error_message }}</p>
-        </div>
-        {% endif %}
-        <div class="id-card">
-            <h2>Name: {{ name }}</h2>
-            <p class="label">Date of Birth: {{ birth_date }}</p>
-            <p class="label">Age: {{ age }}</p>
-            {% if pan_number and not aadhaar_number %}
-            <p class="label">PAN Number: {{ pan_number }}</p>
+        <div class="details-column">
+            {% if error_message %}
+            <div class="error-message">
+                <p>{{ error_message }}</p>
+            </div>
             {% endif %}
-            {% if aadhaar_number and not pan_number %}
-            <p class="label">Aadhaar Number: {{ aadhaar_number }}</p>
-            {% endif %}
-            <p class="label">Pass Expires On: {{ expiry_date }}</p> <!-- Added expiry date -->
-        </div>
-        <div class="qr-code">
-            {% if qr_code_image_data %}
-            <img src="data:image/png;base64,{{ qr_code_image_data }}" alt="QR Code">
-            {% else %}
-            <p>No QR Code available</p>
-            {% endif %}
-        </div>
-        <div class="file-upload">
-            <form action="{% url 'upload_image' %}" method="POST" enctype="multipart/form-data">
+            <div class="id-card">
+                <h2>Name: {{ name }}</h2>
+                <p class="label">Date of Birth: {{ birth_date }}</p>
+                <p class="label">Age: {{ age }}</p>
+                {% if pan_number and not aadhaar_number %}
+                <p class="label">PAN Number: {{ pan_number }}</p>
+                {% endif %}
+                {% if aadhaar_number and not pan_number %}
+                <p class="label">Aadhaar Number: {{ aadhaar_number }}</p>
+                {% endif %}
+                {% if email %}
+                <p class="label">Email: {{ email }}</p>
+                {% endif %}
+                {% if phone_number %}
+                <p class="label">Phone Number: {{ phone_number }}</p>
+                {% endif %}
+                <p class="label">Pass Expires On: {{ expiry_date }}</p>
+            </div>
+            <div class="file-upload">
+                <form action="{% url 'upload_image' %}" method="POST" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <label class="file-upload-btn">
+                        Choose File
+                        <input type="file" name="image" accept="image/*" id="image">
+                    </label>
+                    <div class="form-group">
+                        <label for="email">Email:</label>
+                        <input type="email" name="email" id="email">
+                    </div>
+                    <div class="form-group">
+                        <label for="phone_number">Phone Number:</label>
+                        <input type="tel" name="phone_number" id="phone_number">
+                    </div>
+                    <button type="submit" class="file-upload-btn">Upload Image</button>
+                </form>
+            </div>
+            {% if name %}
+            <form action="{% url 'download_pdf' %}" method="POST">
                 {% csrf_token %}
-                <label class="file-upload-btn">
-                    Choose File
-                    <input type="file" name="image" accept="image/*" id="image">
-                </label>
-                <button type="submit" class="file-upload-btn">Upload Image</button>
+                <input type="hidden" name="name" value="{{ name }}">
+                <input type="hidden" name="birth_date" value="{{ birth_date }}">
+                <input type="hidden" name="age" value="{{ age }}">
+                <input type="hidden" name="pan_number" value="{{ pan_number }}">
+                <input type="hidden" name="aadhaar_number" value="{{ aadhaar_number }}">
+                <input type="hidden" name="expiry_date" value="{{ expiry_date }}">
+                <input type="hidden" name="email" value="{{ email }}">
+                <input type="hidden" name="phone_number" value="{{ phone_number }}">
+                <input type="hidden" name="qr_code_image_data" value="{{ qr_code_image_data }}">
+                <button type="submit" class="file-upload-btn">Download as PDF</button>
             </form>
+            {% endif %}
         </div>
-        {% if name %}
-        <form action="{% url 'download_pdf' %}" method="POST">
-            {% csrf_token %}
-            <input type="hidden" name="name" value="{{ name }}">
-            <input type="hidden" name="birth_date" value="{{ birth_date }}">
-            <input type="hidden" name="age" value="{{ age }}">
-            <input type="hidden" name="pan_number" value="{{ pan_number }}">
-            <input type="hidden" name="aadhaar_number" value="{{ aadhaar_number }}">
-            <input type="hidden" name="expiry_date" value="{{ expiry_date }}"> <!-- Pass expiry date to the form -->
-            <button type="submit" class="file-upload-btn">Download as PDF</button>
-        </form>
-        {% endif %}
+        <div class="qr-code-column">
+            <div class="qr-code">
+                {% if qr_code_image_data %}
+                <img src="data:image/png;base64,{{ qr_code_image_data }}" alt="QR Code">
+                {% else %}
+                <p>No QR Code available</p>
+                {% endif %}
+            </div>
+        </div>
     </div>
 </body>
 </html>
