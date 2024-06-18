@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 
 def home(request):
-    return render(request, 'ocr_app/home.html')
+    return render(request, 'ocr_app/index.html')
 
 def preprocess_image(image):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -332,7 +332,7 @@ def upload_image(request):
             
             if not name or not birth_date:
                 error_message = "Image quality is too poor. Please take another picture and upload again."
-                return render(request, 'ocr_app/home.html', {'error_message': error_message})
+                return render(request, 'ocr_app/index.html', {'error_message': error_message})
 
             qr_code_image_data = create_qr_code(name, birth_date, pan_number, aadhaar_number, phone_number, email)
 
@@ -352,19 +352,19 @@ def upload_image(request):
                 'email': email,
             }
 
-            return render(request, 'ocr_app/home.html', context)
+            return render(request, 'ocr_app/index.html', context)
 
         except ValueError as ve:
             logging.error("Error during image processing: %s", ve)
             error_message = "Image quality is too poor. Please take another picture and upload again."
-            return render(request, 'ocr_app/home.html', {'error_message': error_message})
+            return render(request, 'ocr_app/index.html', {'error_message': error_message})
 
         except Exception as e:
             logging.error("Unexpected error during image processing: %s", e)
             error_message = "Image quality is too poor. Please take another picture and upload again."
-            return render(request, 'ocr_app/home.html', {'error_message': error_message})
+            return render(request, 'ocr_app/index.html', {'error_message': error_message})
 
-    return render(request, 'ocr_app/home.html')
+    return render(request, 'ocr_app/index.html')
 
 
 '''@csrf_exempt  
